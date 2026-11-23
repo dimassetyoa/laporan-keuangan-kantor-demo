@@ -215,6 +215,10 @@ sup{color:var(--accent);font-weight:750;font-size:9px}
 .err{background:var(--coral-bg);border:1px solid #f0c8bf;color:var(--coral);border-radius:var(--r-md);
  padding:9px 12px;font-size:11.5px;margin-top:10px}
 .err[hidden]{display:none}
+.nokontrak{background:var(--amber-bg);border:1px solid #ecd9a8;color:#6d4a05;border-radius:var(--r-md);
+ padding:10px 12px;font-size:11.5px;line-height:1.6;margin-bottom:12px}
+.nokontrak[hidden]{display:none}
+.nokontrak .btn{margin-top:8px}
 .filein{display:none}
 /* ---------- pembayaran bertahap pengajuan ---------- */
 .payinfo{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px}
@@ -488,6 +492,7 @@ svg .ghit.ghi,svg .ghit.gsel-on{fill:rgba(188,58,42,.10)}
  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="mlTitle">
   <h3 id="mlTitle">Tambah baris ledger</h3>
   <p class="hint">Baris tersimpan ke ledger dan semua total, kasbon, serta laporan ikut terhitung ulang.</p>
+  <div class="nokontrak" id="lf_nokontrak" hidden><b>Belum ada kontrak.</b> Setiap baris ledger terkait ke satu kontrak, jadi buat kontrak pertama dulu — setelah tersimpan, formulir ini bisa diisi.<div><button type="button" class="btn primary sm" data-addkontrak>+ Tambah kontrak pertama</button></div></div>
   <form id="formLedger" novalidate>
    <input type="hidden" id="lf_id">
    <div class="fgrid">
@@ -514,6 +519,7 @@ svg .ghit.ghi,svg .ghit.gsel-on{fill:rgba(188,58,42,.10)}
 <div class="overlay" id="ovPengajuan" hidden>
  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="mpTitle">
   <h3 id="mpTitle">Tambah pengajuan</h3>
+  <div class="nokontrak" id="pf_nokontrak" hidden><b>Belum ada kontrak.</b> Setiap pengajuan terkait ke satu kontrak, jadi buat kontrak pertama dulu — setelah tersimpan, formulir ini bisa diisi.<div><button type="button" class="btn primary sm" data-addkontrak>+ Tambah kontrak pertama</button></div></div>
   <p class="hint">Register pengajuan dari koorlap / logistik / mandor. Status bisa diatur manual — termasuk pengajuan yang sudah LUNAS — lewat pilihan Status di bawah: pilihan manual hanya mengubah label status yang tampil, sedangkan angka Dibayar, Sisa, dan % tetap dihitung dari cicilan.</p>
   <form id="formPengajuan" novalidate>
    <input type="hidden" id="pf_id">
@@ -601,6 +607,7 @@ svg .ghit.ghi,svg .ghit.gsel-on{fill:rgba(188,58,42,.10)}
 <div class="overlay" id="ovPemasukan" hidden>
  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="pmTitle">
   <h3 id="pmTitle">Tambah pemasukan</h3>
+  <div class="nokontrak" id="mf_nokontrak" hidden><b>Belum ada kontrak.</b> Pemasukan tetap bisa dicatat sebagai Umum / tidak terkait kontrak, tetapi sumber <b>Pembayaran SPK/SPJ</b> wajib terkait ke kontrak — buat kontrak pertama dulu bila pemasukan ini berasal dari SPK/SPJ.<div><button type="button" class="btn primary sm" data-addkontrak>+ Tambah kontrak pertama</button></div></div>
   <p class="hint">Dana masuk ke keuangan kantor. Asal dana (sumber), kontrak terkait, dan rekening tujuan adalah tiga isian terpisah. Dana Talangan Bos adalah pinjaman/titipan — bukan pendapatan proyek.</p>
   <form id="formPemasukan" novalidate>
    <input type="hidden" id="mf_id">
@@ -4393,9 +4400,26 @@ document.querySelectorAll('.overlay').forEach(ov => {
   ov.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => closeOv(ov)));
 });
 function fillKontrakSelect(sel, val) {
+  if (!DB.kontrak.length) {
+    __tunnel.setInnerHTML(sel, '<option value="">— Belum ada kontrak —</option>', "innerHTML");
+    sel.value = '';
+    return;
+  }
   __tunnel.setInnerHTML(sel, DB.kontrak.map(k => `<option value="${esc(k.kode)}">${esc(k.kode)} — ${esc(k.nama)}</option>`).join(''), "innerHTML");
   if (val) sel.value = val;
 }
+function updNoKontrak() {
+  const none = !DB.kontrak.length;
+  ['lf_nokontrak', 'pf_nokontrak', 'mf_nokontrak'].forEach(id => {
+    const el = $(id);
+    if (el) el.hidden = !none;
+  });
+}
+document.querySelectorAll('[data-addkontrak]').forEach(b => b.addEventListener('click', () => {
+  const ov = b.closest('.overlay');
+  if (ov) closeOv(ov);
+  openKontrak(null);
+}));
 function fillOptSelect(sel, values, val) {
   __tunnel.setInnerHTML(sel, values.map(v => `<option value="${esc(v)}">${esc(v)}</option>`).join(''), "innerHTML");
   if (val) sel.value = val;
@@ -4410,7 +4434,8 @@ function openLedger(row) {
   $('lf_id').value = row ? row.id : '';
   $('lf_tanggal').value = row ? row.tanggal || todayStr() : todayStr();
   $('lf_spm').value = row ? row.no_spm || '' : '';
-  fillKontrakSelect($('lf_kontrak'), row ? row.kode_spj : S.kontrak || DB.kontrak[0].kode);
+  fillKontrakSelect($('lf_kontrak'), row ? row.kode_spj : S.kontrak || (DB.kontrak[0] ? DB.kontrak[0].kode : ''));
+  updNoKontrak();
   const jList = [...new Set(['Kasbon', 'Operasional', 'Pembayaran', 'Pembelian', 'Penyelesaian', ...jenisList()])];
   fillOptSelect($('lf_jenis'), jList, row ? row.jenis : 'Operasional');
   $('lf_penerima').value = row ? row.penerima || '' : '';
@@ -4427,6 +4452,7 @@ $('formLedger').addEventListener('submit', e => {
   const masuk = Math.max(0, Number($('lf_masuk').value) || 0),
     keluar = Math.max(0, Number($('lf_keluar').value) || 0);
   if (!tgl) return showErr('lf_err', 'Tanggal wajib diisi.');
+  if (!$('lf_kontrak').value) return showErr('lf_err', 'Belum ada kontrak yang dipilih — buat kontrak pertama dulu lewat tombol "+ Tambah kontrak pertama" di bagian atas formulir ini, atau lewat menu Pengaturan & Data.');
   if (masuk === 0 && keluar === 0) return showErr('lf_err', 'Isi nominal Masuk atau Keluar (tidak boleh dua-duanya 0).');
   const data = {
     tanggal: tgl,
@@ -4460,7 +4486,8 @@ function openPengajuan(row) {
   $('mpTitle').textContent = row ? 'Edit pengajuan' : 'Tambah pengajuan';
   $('pf_id').value = row ? row.id : '';
   $('pf_spm').value = row ? row.no_spm || '' : '';
-  fillKontrakSelect($('pf_kontrak'), row ? row.kode_spj : S.kontrak || DB.kontrak[0].kode);
+  fillKontrakSelect($('pf_kontrak'), row ? row.kode_spj : S.kontrak || (DB.kontrak[0] ? DB.kontrak[0].kode : ''));
+  updNoKontrak();
   $('pf_keterangan').value = row ? row.keterangan || '' : '';
   $('pf_penerima').value = row ? row.penerima || '' : '';
   $('pf_nominal').value = row ? Number(row.nominal) || 0 : 0;
@@ -4480,6 +4507,7 @@ $('formPengajuan').addEventListener('submit', e => {
   const ket = $('pf_keterangan').value.trim();
   if (!ket) return showErr('pf_err', 'Keterangan wajib diisi.');
   if (nominal <= 0) return showErr('pf_err', 'Nominal harus lebih dari 0.');
+  if (!$('pf_kontrak').value) return showErr('pf_err', 'Belum ada kontrak yang dipilih — buat kontrak pertama dulu lewat tombol "+ Tambah kontrak pertama" di bagian atas formulir ini, atau lewat menu Pengaturan & Data.');
   const id = $('pf_id').value;
   const existing = id ? DB.pengajuan.find(x => x.id === id) : null;
   const manualPilihan = $('pf_status').value;
@@ -4704,7 +4732,8 @@ function openPemasukan(row) {
   const ks = $('mf_kontrak');
   __tunnel.setInnerHTML(ks, '<option value="">— Umum / tidak terkait kontrak —</option>' + DB.kontrak.map(k => `<option value="${esc(k.kode)}">${esc(k.kode)} — ${esc(k.nama)}</option>`).join(''), "innerHTML");
   ks.value = row ? row.kode_spj || '' : '';
-  fillRekeningSelect($('mf_rekening'), row ? row.rekening : DB.rekening[0]);
+  fillRekeningSelect($('mf_rekening'), row ? row.rekening : DB.rekening[0] || '');
+  updNoKontrak();
   $('mf_jumlah').value = row ? Number(row.jumlah) || 0 : '';
   $('mf_keterangan').value = row ? row.keterangan || '' : '';
   showErr('mf_err', '');
@@ -4718,7 +4747,7 @@ $('formPemasukan').addEventListener('submit', e => {
   const jumlah = Math.round(Number($('mf_jumlah').value) || 0);
   if (!tgl) return showErr('mf_err', 'Tanggal wajib diisi.');
   if (!(jumlah > 0)) return showErr('mf_err', 'Jumlah harus lebih dari 0.');
-  if (sumber === 'SPK' && !kode) return showErr('mf_err', 'Sumber Pembayaran SPK/SPJ wajib dikaitkan ke kontrak — pilih kontrak terkaitnya.');
+  if (sumber === 'SPK' && !kode) return showErr('mf_err', DB.kontrak.length ? 'Sumber Pembayaran SPK/SPJ wajib dikaitkan ke kontrak — pilih kontrak terkaitnya.' : 'Sumber Pembayaran SPK/SPJ wajib dikaitkan ke kontrak, tetapi belum ada kontrak sama sekali — buat kontrak pertama dulu lewat tombol "+ Tambah kontrak pertama" di bagian atas formulir ini, atau catat pemasukan ini dengan sumber lain sebagai Umum.');
   const data = {
     tanggal: tgl,
     sumber,
